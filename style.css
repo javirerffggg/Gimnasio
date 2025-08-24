@@ -1,0 +1,284 @@
+/* --- Reset y Estilos Base --- */
+:root {
+    --bg-color: #121212;
+    --card-color: #1e1e1e;
+    --primary-text-color: #e0e0e0;
+    --secondary-text-color: #b3b3b3;
+    --accent-color: #bb86fc;
+    --accent-color-darker: #3700b3;
+    --border-color: #2c2c2c;
+    --success-color: #03dac6;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-color);
+    color: var(--primary-text-color);
+    line-height: 1.6;
+}
+
+/* --- Navegación Principal --- */
+.main-nav {
+    display: flex;
+    justify-content: center;
+    padding: 10px;
+    background-color: var(--card-color);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.nav-btn {
+    background: none;
+    border: none;
+    color: var(--secondary-text-color);
+    padding: 10px 20px;
+    margin: 0 10px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.3s, border-bottom-color 0.3s;
+}
+
+.nav-btn:hover {
+    color: var(--primary-text-color);
+}
+
+.nav-btn.active {
+    color: var(--accent-color);
+    border-bottom-color: var(--accent-color);
+}
+
+/* --- Contenedor Principal y Vistas --- */
+#app {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeIn 0.5s 0.2s forwards;
+}
+
+.view { display: none; }
+.view.active { display: block; }
+
+@keyframes fadeIn {
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Cabecera y Navegación de Días --- */
+.workout-header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.date-navigation {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.nav-arrow {
+    background-color: var(--card-color);
+    border: 1px solid var(--border-color);
+    color: var(--primary-text-color);
+    padding: 10px 15px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    transition: background-color 0.3s;
+}
+.nav-arrow:hover { background-color: #2a2a2a; }
+
+.workout-header h1 {
+    font-size: 1.8rem;
+    font-weight: 900;
+    color: var(--accent-color);
+}
+
+.workout-header p {
+    font-size: 1rem;
+    color: var(--secondary-text-color);
+}
+
+/* --- Sección de Calentamiento --- */
+.warmup-card {
+    background-color: var(--card-color);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 30px;
+    border: 1px solid var(--border-color);
+}
+.warmup-card h2 {
+    font-size: 1.5rem;
+    margin-bottom: 15px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+}
+.warmup-card ul {
+    list-style: none;
+}
+.warmup-card li {
+    margin-bottom: 8px;
+    color: var(--secondary-text-color);
+}
+.warmup-card strong {
+    color: var(--primary-text-color);
+    font-weight: 500;
+}
+
+/* --- Tarjetas de Ejercicios y Tracking --- */
+.exercise-list { display: grid; gap: 20px; }
+.exercise-card {
+    background-color: var(--card-color);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid var(--border-color);
+}
+.exercise-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+.exercise-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: color 0.3s;
+}
+.exercise-title:hover { color: var(--accent-color); }
+.last-performance {
+    font-size: 0.8rem;
+    color: var(--secondary-text-color);
+    background-color: var(--bg-color);
+    padding: 5px 10px;
+    border-radius: 6px;
+}
+
+.sets-grid { display: grid; gap: 10px; }
+.set-row {
+    display: grid;
+    grid-template-columns: 30px 1fr 1fr 50px;
+    gap: 10px;
+    align-items: center;
+}
+.set-number {
+    font-weight: bold;
+    color: var(--secondary-text-color);
+}
+.input-group input {
+    width: 100%;
+    background-color: var(--bg-color);
+    border: 1px solid var(--border-color);
+    color: var(--primary-text-color);
+    padding: 8px;
+    border-radius: 6px;
+    text-align: center;
+    font-size: 1rem;
+}
+.set-checkbox {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--accent-color);
+}
+.rest-timer-btn {
+    grid-column: 1 / -1;
+    background-color: var(--accent-color-darker);
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: background-color 0.3s;
+}
+.rest-timer-btn:hover { background-color: var(--accent-color); }
+
+
+/* --- Vista de Progreso --- */
+#progress-view h1 {
+    text-align: center;
+    margin-bottom: 30px;
+    color: var(--accent-color);
+}
+.chart-container {
+    background-color: var(--card-color);
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
+/* --- Modales --- */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0; top: 0;
+    width: 100%; height: 100%;
+    background-color: rgba(0,0,0,0.7);
+    animation: fadeInModal 0.3s;
+}
+.modal-content {
+    background-color: var(--card-color);
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid var(--border-color);
+    width: 90%;
+    max-width: 500px;
+    border-radius: 12px;
+    position: relative;
+}
+.close-btn {
+    color: #aaa;
+    position: absolute;
+    top: 10px; right: 20px;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+.close-btn:hover { color: white; }
+.video-placeholder {
+    background-color: var(--bg-color);
+    height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    margin-top: 15px;
+}
+@keyframes fadeInModal { from { opacity: 0; } to { opacity: 1; } }
+
+/* --- Modal del Temporizador --- */
+.timer-modal-content {
+    text-align: center;
+    padding: 40px;
+}
+#timer-display {
+    font-size: 4rem;
+    font-weight: 900;
+    color: var(--accent-color);
+}
+
+/* --- Otros --- */
+.loader {
+    width: 50px; height: 50px;
+    border: 5px solid var(--border-color);
+    border-top-color: var(--accent-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 50px auto;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* --- Responsive Design --- */
+@media (max-width: 600px) {
+    #app { padding: 10px; }
+    .set-row { grid-template-columns: 25px 1fr 1fr 40px; gap: 8px; }
+}
