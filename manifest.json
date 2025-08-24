@@ -1,0 +1,22 @@
+{
+    "name": "Mi Rutina de Gimnasio",
+    "short_name": "Mi Rutina",
+    "description": "Una aplicación simple para ver tu rutina de entrenamiento diaria.",
+    "start_url": "/index.html",
+    "display": "standalone",
+    "background_color": "#121212",
+    "theme_color": "#1a1a1a",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "https://placehold.co/192x192/bb86fc/ffffff?text=Gym",
+            "type": "image/png",
+            "sizes": "192x192"
+        },
+        {
+            "src": "https://placehold.co/512x512/bb86fc/ffffff?text=Gym",
+            "type": "image/png",
+            "sizes": "512x512"
+        }
+    ]
+}
