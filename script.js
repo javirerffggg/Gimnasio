@@ -76,6 +76,14 @@ document.addEventListener('DOMContentLoaded', () => {
         data[dateKey][exercise][setIndex][field] = value;
         setStoredData(data);
     }
+    
+    function saveNote(date, note) {
+        const data = getStoredData();
+        const dateKey = getFormattedDate(date);
+        if (!data[dateKey]) data[dateKey] = {};
+        data[dateKey].note = note;
+        setStoredData(data);
+    }
 
     const getFormattedDate = (date) => date.toISOString().split('T')[0];
     
@@ -168,7 +176,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     <h2>Calentamiento (RAMP)</h2>
                     <ul>${warmup.map(item => `<li>${item}</li>`).join('')}</ul>
                 </div>
-                <main class="exercise-list">${exercisesHTML}</main>`;
+                <main class="exercise-list">${exercisesHTML}</main>
+                <div class="notes-card">
+                    <h2>Notas del Día</h2>
+                    <textarea id="daily-notes" placeholder="¿Cómo te sentiste? ¿Dormiste bien? ¿Alguna molestia?"></textarea>
+                </div>
+                `;
         }
         setupWorkoutListeners(date);
         loadWorkoutData(date);
@@ -191,7 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
         progressView.innerHTML = `
             <div class="progress-header">
                 <h1>Progreso y Volumen</h1>
-                <button id="generate-report-btn" class="primary-btn">Generar Reporte Semanal</button>
+                <button id="generate-report-btn" class="primary-btn">Analizar Semana con IA</button>
             </div>
             <div id="charts-wrapper">${chartsHTML}</div>
         `;
@@ -209,7 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('charts-wrapper').innerHTML = `<p class="no-progress">Aún no hay datos de progreso. ¡Completa un entrenamiento para empezar!</p>`;
         }
         
-        document.getElementById('generate-report-btn').addEventListener('click', generateWeeklyReport);
+        document.getElementById('generate-report-btn').addEventListener('click', analyzeWeekWithAI);
     }
 
     function createChart(data, exerciseName, canvasId, chartLabel) {
@@ -218,7 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let hasData = false;
 
         sortedDates.forEach(date => {
-            if (data[date][exerciseName]) {
+            if (data[date] && data[date][exerciseName]) {
                 const volume = data[date][exerciseName].reduce((acc, set) => acc + ((set.weight || 0) * (set.reps || 0)), 0);
                 if (volume > 0) {
                     chartData.labels.push(new Date(date).toLocaleDateString('es-ES', {day: '2-digit', month: 'short'}));
@@ -239,102 +252,84 @@ document.addEventListener('DOMContentLoaded', () => {
         return true;
     }
 
-    // --- LÓGICA DE REPORTE SEMANAL ---
-    function generateWeeklyReport() {
-        const today = new Date();
-        const dayOfWeek = today.getDay(); // 0=Domingo, 1=Lunes, ...
+    // --- LÓGICA DE ANÁLISIS CON IA ---
+    async function analyzeWeekWithAI() {
+        const reportLoader = document.getElementById('report-loader');
+        const reportContent = document.getElementById('report-content');
         
-        // Calcular inicio y fin de la última semana completa (Lunes a Domingo)
+        reportContent.textContent = '';
+        reportLoader.classList.add('visible');
+        reportModal.style.display = 'block';
+
+        // 1. Recopilar datos
+        const today = new Date();
+        const dayOfWeek = today.getDay();
         const endDateOfLastWeek = new Date(today);
         endDateOfLastWeek.setDate(today.getDate() - (dayOfWeek === 0 ? 7 : dayOfWeek));
         const startDateOfLastWeek = new Date(endDateOfLastWeek);
         startDateOfLastWeek.setDate(endDateOfLastWeek.getDate() - 6);
 
-        const startDateOfTwoWeeksAgo = new Date(startDateOfLastWeek);
-        startDateOfTwoWeeksAgo.setDate(startDateOfLastWeek.getDate() - 7);
-
+        let weeklyDataString = "";
         const allData = getStoredData();
-        let report = "";
-
-        // 1. Fase Específica del Plan
-        const week = getCurrentWeek(endDateOfLastWeek);
-        const meso = getMesocycle(week);
-        report += `REPORTE SEMANAL (Semana del ${startDateOfLastWeek.toLocaleDateString('es-ES')} al ${endDateOfLastWeek.toLocaleDateString('es-ES')})\n`;
-        report += `===========================================================\n`;
-        report += `Fase del Plan: ${meso.name}, Semana ${week} de 9\n\n`;
-
-        // 2. Progresión de Cargas/Repeticiones
-        report += `PROGRESIÓN DE CARGAS (Mejor serie vs. semana anterior):\n`;
-        const mainExercises = ["Press de Banca en Máquina", "Sentadilla Hack en Máquina", "Dominadas (o Jalón al Pecho)", "Press de Hombro en Máquina"];
-        
-        function findBestSet(startDate, endDate, exercise) {
-            let bestSet = { weight: 0, reps: 0 };
-            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-                const dateKey = getFormattedDate(d);
-                if (allData[dateKey] && allData[dateKey][exercise]) {
-                    allData[dateKey][exercise].forEach(set => {
-                        if (set.weight > bestSet.weight) {
-                            bestSet = set;
-                        }
-                    });
-                }
-            }
-            return bestSet.weight > 0 ? bestSet : null;
-        }
-
-        mainExercises.forEach(ex => {
-            const lastWeekSet = findBestSet(startDateOfLastWeek, endDateOfLastWeek, ex);
-            const prevWeekSet = findBestSet(startDateOfTwoWeeksAgo, new Date(startDateOfLastWeek - 1), ex);
-            
-            if (lastWeekSet) {
-                let comparison = "(sin datos de la semana anterior)";
-                if (prevWeekSet) {
-                    const weightDiff = lastWeekSet.weight - prevWeekSet.weight;
-                    comparison = `(${weightDiff >= 0 ? '+' : ''}${weightDiff.toFixed(1)} kg vs. semana pasada)`;
-                }
-                report += `- ${ex}: ${lastWeekSet.weight} kg x ${lastWeekSet.reps} reps ${comparison}\n`;
-            } else {
-                report += `- ${ex}: No se registraron datos esta semana.\n`;
-            }
-        });
-        report += `\n`;
-
-        // 3. RIR Promedio y Volumen
-        const weeklyRIRs = new Set();
-        const volumeByMuscle = {};
-        Object.keys(muscleGroupMapping).forEach(group => volumeByMuscle[group] = 0);
-
         for (let d = new Date(startDateOfLastWeek); d <= endDateOfLastWeek; d.setDate(d.getDate() + 1)) {
             const dateKey = getFormattedDate(d);
-            const dayType = trainingCalendar[dateKey];
-            if (dayType && dayType !== 'descanso' && allData[dateKey]) {
-                const mesoKey = getMesocycle(getCurrentWeek(d)).key;
-                const workout = trainingData[dayType];
-                Object.keys(workout.exercises).forEach(exName => {
-                    if (allData[dateKey][exName]) {
-                        const completedSets = allData[dateKey][exName].filter(s => s.done).length;
-                        if (completedSets > 0) {
-                            weeklyRIRs.add(workout.exercises[exName][mesoKey].rir);
-                            for (const group in muscleGroupMapping) {
-                                if (muscleGroupMapping[group].includes(exName)) {
-                                    volumeByMuscle[group] += completedSets;
-                                }
-                            }
-                        }
+            if (allData[dateKey]) {
+                weeklyDataString += `\nDía (${dateKey}):\n`;
+                if (allData[dateKey].note) {
+                    weeklyDataString += `- Notas: "${allData[dateKey].note}"\n`;
+                }
+                for (const ex in allData[dateKey]) {
+                    if (ex !== 'note') {
+                        const sets = allData[dateKey][ex].map(s => `${s.weight || 0}kg x ${s.reps || 0} reps`).join(', ');
+                        weeklyDataString += `- ${ex}: ${sets}\n`;
                     }
-                });
+                }
             }
         }
         
-        report += `RIR PROMEDIO (Estimado según el plan): ${[...weeklyRIRs].join(', ') || 'N/A'}\n\n`;
-        report += `VOLUMEN DE ENTRENAMIENTO (Series efectivas completadas):\n`;
-        Object.entries(volumeByMuscle).filter(([,vol]) => vol > 0).forEach(([group, vol]) => {
-            report += `- ${group}: ${vol} series\n`;
-        });
+        // 2. Crear el prompt
+        const prompt = `
+            Eres un entrenador personal experto en fitness y análisis de datos. Analiza los siguientes datos de entrenamiento de la última semana de un usuario y proporciona un análisis conciso y útil en español.
 
-        // Mostrar el reporte
-        document.getElementById('report-content').textContent = report;
-        reportModal.style.display = 'block';
+            **Contexto del Usuario:**
+            - Objetivo Principal: Hipertrofia
+            - Nivel: Intermedio
+
+            **Datos de la Semana (del ${startDateOfLastWeek.toLocaleDateString('es-ES')} al ${endDateOfLastWeek.toLocaleDateString('es-ES')}):**
+            ${weeklyDataString || "No se registraron entrenamientos esta semana."}
+
+            **Análisis Requerido (responde en formato markdown):**
+            1.  **Resumen General:** Proporciona un breve resumen del rendimiento y la consistencia de la semana.
+            2.  **Puntos Clave:** Identifica los mayores logros (ej. levantamientos pesados) y los puntos débiles o estancamientos.
+            3.  **Conexión entre Notas y Rendimiento:** Analiza si las notas del usuario (como mal sueño, estrés, molestias) se correlacionan con un bajo rendimiento en algún día específico.
+            4.  **Sugerencias Accionables:** Ofrece 2-3 sugerencias específicas para la próxima semana.
+        `;
+        
+        // 3. Llamar a la función serverless (proxy)
+        try {
+            // La URL ahora apunta a nuestra propia función serverless, no a Google directamente.
+            const apiUrl = "/api/analizar";
+            
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: prompt }) // Enviamos el prompt en el cuerpo
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || `Error del servidor: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            const analysis = result.candidates[0].content.parts[0].text;
+            reportContent.textContent = analysis;
+
+        } catch (error) {
+            reportContent.textContent = `Error al generar el análisis: ${error.message}\n\nAsegúrate de que la aplicación está desplegada en un servicio como Vercel y que la clave API está configurada correctamente en las variables de entorno.`;
+        } finally {
+            reportLoader.classList.remove('visible');
+        }
     }
 
 
@@ -353,6 +348,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.exercise-title').forEach(el => el.addEventListener('click', showExerciseModal));
         document.querySelectorAll('.rest-timer-btn').forEach(el => el.addEventListener('click', startRestTimer));
         document.querySelectorAll('.sets-grid input').forEach(el => el.addEventListener('change', handleInputChange));
+        document.getElementById('daily-notes')?.addEventListener('input', (e) => saveNote(date, e.target.value));
     }
 
     function handleInputChange(e) {
@@ -365,6 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = getStoredData();
         const dateKey = getFormattedDate(date);
         if (!data[dateKey]) return;
+        
         document.querySelectorAll('.sets-grid input').forEach(input => {
             const { exercise, set, field } = input.dataset;
             const setData = data[dateKey][exercise]?.[parseInt(set)];
@@ -373,6 +370,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 else input.value = setData[field];
             }
         });
+
+        const notesInput = document.getElementById('daily-notes');
+        if (notesInput && data[dateKey].note) {
+            notesInput.value = data[dateKey].note;
+        }
     }
 
     function switchView(viewId) {
@@ -431,7 +433,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const reportText = document.getElementById('report-content').textContent;
         navigator.clipboard.writeText(reportText).then(() => {
             e.target.textContent = '¡Copiado!';
-            setTimeout(() => { e.target.textContent = 'Copiar Reporte'; }, 2000);
+            setTimeout(() => { e.target.textContent = 'Copiar Análisis'; }, 2000);
         });
     });
 
