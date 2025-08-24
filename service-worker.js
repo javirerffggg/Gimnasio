@@ -1,10 +1,12 @@
 // Define el nombre de la caché y los archivos a cachear.
-const CACHE_NAME = 'mi-rutina-cache-v1';
+const CACHE_NAME = 'mi-rutina-cache-v2'; // Versión actualizada para forzar la actualización
 const urlsToCache = [
-    '/',
-    '/index.html',
-    '/style.css',
-    '/script.js',
+    './',
+    './index.html',
+    './style.css',
+    './script.js',
+    './manifest.json',
+    'https://cdn.jsdelivr.net/npm/chart.js',
     'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap',
     'https://fonts.gstatic.com/s/inter/v13/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa1ZL7.woff2'
 ];
@@ -15,14 +17,14 @@ self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => {
-                console.log('Caché abierta');
+                console.log('Caché abierta y archivos añadidos');
                 return cache.addAll(urlsToCache);
             })
     );
 });
 
 // Evento 'activate': se dispara cuando el Service Worker se activa.
-// Aquí se pueden limpiar cachés antiguas si es necesario.
+// Aquí se limpian cachés antiguas para asegurar que usamos la nueva.
 self.addEventListener('activate', event => {
     const cacheWhitelist = [CACHE_NAME];
     event.waitUntil(
@@ -30,6 +32,7 @@ self.addEventListener('activate', event => {
             return Promise.all(
                 cacheNames.map(cacheName => {
                     if (cacheWhitelist.indexOf(cacheName) === -1) {
+                        console.log('Borrando caché antigua:', cacheName);
                         return caches.delete(cacheName);
                     }
                 })
@@ -38,9 +41,8 @@ self.addEventListener('activate', event => {
     );
 });
 
-// Evento 'fetch': se dispara cada vez que la aplicación solicita un recurso (p. ej., una imagen, un script).
+// Evento 'fetch': se dispara cada vez que la aplicación solicita un recurso.
 // Interceptamos la petición y respondemos con el archivo desde la caché si está disponible.
-// Si no, lo buscamos en la red.
 self.addEventListener('fetch', event => {
     event.respondWith(
         caches.match(event.request)
