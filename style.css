@@ -40,6 +40,11 @@ body {
 .primary-btn:hover {
     background-color: #a76ff0;
 }
+.primary-btn:disabled {
+    background-color: #555;
+    cursor: not-allowed;
+    color: #999;
+}
 
 
 /* --- Navegación Principal --- */
@@ -128,6 +133,37 @@ body {
     font-size: 1rem;
     color: var(--secondary-text-color);
 }
+
+/* --- Tarjetas de Coach y Desafío --- */
+.coach-card, .challenge-card {
+    background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+.coach-card-icon, .challenge-card-icon {
+    font-size: 2rem;
+    color: var(--accent-color);
+}
+.coach-card-content h3, .challenge-card-content h3 {
+    margin-bottom: 5px;
+    color: var(--primary-text-color);
+}
+.coach-card-content p, .challenge-card-content p {
+    color: var(--secondary-text-color);
+    font-size: 0.9rem;
+}
+.challenge-card-content button {
+    margin-top: 10px;
+    width: auto;
+    padding: 8px 15px;
+    font-size: 0.9rem;
+}
+
 
 /* --- Sección de Calentamiento y Notas --- */
 .warmup-card, .notes-card {
