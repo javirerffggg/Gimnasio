@@ -30,6 +30,9 @@ body {
     padding: 10px;
     background-color: var(--card-color);
     border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    z-index: 100;
 }
 
 .nav-btn {
@@ -214,6 +217,11 @@ body {
     border-radius: 12px;
     margin-bottom: 20px;
 }
+.no-progress {
+    text-align: center;
+    color: var(--secondary-text-color);
+    padding: 40px;
+}
 
 /* --- Modales --- */
 .modal {
@@ -227,13 +235,16 @@ body {
 }
 .modal-content {
     background-color: var(--card-color);
-    margin: 15% auto;
+    margin: 10% auto;
     padding: 20px;
     border: 1px solid var(--border-color);
     width: 90%;
     max-width: 500px;
     border-radius: 12px;
     position: relative;
+}
+#modal-exercise-content p {
+    margin-bottom: 10px;
 }
 .close-btn {
     color: #aaa;
@@ -252,6 +263,8 @@ body {
     justify-content: center;
     border-radius: 8px;
     margin-top: 15px;
+    color: var(--secondary-text-color);
+    border: 1px dashed var(--border-color);
 }
 @keyframes fadeInModal { from { opacity: 0; } to { opacity: 1; } }
 
