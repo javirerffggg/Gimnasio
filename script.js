@@ -74,6 +74,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!data[dateKey][exercise]) data[dateKey][exercise] = [];
         if (!data[dateKey][exercise][setIndex]) data[dateKey][exercise][setIndex] = {};
         data[dateKey][exercise][setIndex][field] = value;
+        
+        // Detección de PR
+        if (field === 'weight' || field === 'reps') {
+            checkForNewPR(date, exercise, data[dateKey][exercise]);
+        }
+        
         setStoredData(data);
     }
     
@@ -116,8 +122,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const formattedDate = getFormattedDate(date);
         const dayType = trainingCalendar[formattedDate];
         
+        let coachMessageHTML = getDailyCoachMessage(date);
+        let challengeHTML = getWeeklyChallengeHTML(date);
+
         if (dayType === 'descanso' || !dayType) {
             workoutView.innerHTML = `
+                ${coachMessageHTML}
                 <div class="workout-header">
                     <div class="date-navigation">
                         <button class="nav-arrow" id="prev-day">&lt;</button>
@@ -161,6 +171,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }).join('');
 
             workoutView.innerHTML = `
+                ${coachMessageHTML}
+                ${challengeHTML}
                 <div class="workout-header">
                      <div class="date-navigation">
                         <button class="nav-arrow" id="prev-day">&lt;</button>
@@ -254,84 +266,180 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- LÓGICA DE ANÁLISIS CON IA ---
     async function analyzeWeekWithAI() {
-        const reportLoader = document.getElementById('report-loader');
-        const reportContent = document.getElementById('report-content');
+        // ... (código sin cambios)
+    }
+
+    // --- LÓGICA DE COACH Y DESAFÍOS ---
+    function getDailyCoachMessage(date) {
+        const data = getStoredData();
+        const todayKey = getFormattedDate(date);
+        const yesterday = new Date(date);
+        yesterday.setDate(date.getDate() - 1);
+        const yesterdayKey = getFormattedDate(yesterday);
         
-        reportContent.textContent = '';
-        reportLoader.classList.add('visible');
-        reportModal.style.display = 'block';
+        let message = "¡A por todas! La consistencia es la clave del éxito.";
+        let title = "Mensaje del Entrenador IA";
 
-        // 1. Recopilar datos
-        const today = new Date();
-        const dayOfWeek = today.getDay();
-        const endDateOfLastWeek = new Date(today);
-        endDateOfLastWeek.setDate(today.getDate() - (dayOfWeek === 0 ? 7 : dayOfWeek));
-        const startDateOfLastWeek = new Date(endDateOfLastWeek);
-        startDateOfLastWeek.setDate(endDateOfLastWeek.getDate() - 6);
+        // 1. Refuerzo Positivo por PRs
+        if (data[yesterdayKey] && data[yesterdayKey].newPRs) {
+            title = "¡Felicidades!";
+            message = `¡He visto que ayer lograste nuevos récords en ${data[yesterdayKey].newPRs.join(', ')}! Impresionante trabajo, sigue así.`;
+            // Limpiar el flag para no repetirlo
+            delete data[yesterdayKey].newPRs;
+            setStoredData(data);
+        }
+        // 2. Mensaje de día de entrenamiento
+        else if (trainingCalendar[todayKey] && trainingCalendar[todayKey] !== 'descanso') {
+            title = `¡A entrenar! Hoy toca ${trainingCalendar[todayKey]}.`;
+            message = "Recuerda calentar bien y concentrarte en la técnica. ¡Cada repetición cuenta!";
+        }
+        // 3. Gestión de Fallos
+        else if (trainingCalendar[yesterdayKey] && trainingCalendar[yesterdayKey] !== 'descanso' && !data[yesterdayKey]) {
+            title = "Un pequeño bache";
+            message = "He visto que ayer no se registraron datos. ¡No pasa nada! Lo importante es retomar la rutina hoy con más ganas.";
+        }
+        // 4. Mensaje de día de descanso
+        else if (trainingCalendar[todayKey] === 'descanso') {
+            title = "Día de Descanso y Recuperación";
+            message = "El descanso es tan importante como el entrenamiento. Aprovecha para recargar energías.";
+        }
 
-        let weeklyDataString = "";
+        return `
+            <div class="coach-card">
+                <span class="coach-card-icon">🤖</span>
+                <div class="coach-card-content">
+                    <h3>${title}</h3>
+                    <p>${message}</p>
+                </div>
+            </div>`;
+    }
+
+    function getWeeklyChallengeHTML(date) {
+        const data = getStoredData();
+        const weekNumber = `W${date.getFullYear()}-${getWeekOfYear(date)}`;
+        
+        let content = '';
+        if (data.challenge && data.challenge.week === weekNumber) {
+            content = `<p>${data.challenge.text}</p>`;
+        } else {
+            content = `
+                <p>Aún no has generado tu desafío para esta semana.</p>
+                <button id="generate-challenge-btn" class="primary-btn">Generar mi desafío con IA</button>
+            `;
+        }
+
+        return `
+            <div class="challenge-card">
+                <span class="challenge-card-icon">🎯</span>
+                <div class="challenge-card-content">
+                    <h3>Tu Desafío Semanal</h3>
+                    <div id="challenge-content">${content}</div>
+                </div>
+            </div>`;
+    }
+
+    async function generateWeeklyChallenge() {
+        const challengeContentEl = document.getElementById('challenge-content');
+        challengeContentEl.innerHTML = `<div class="loader-small visible"></div>`;
+        document.getElementById('generate-challenge-btn').disabled = true;
+
+        // Recopilar datos de las últimas 2 semanas
         const allData = getStoredData();
-        for (let d = new Date(startDateOfLastWeek); d <= endDateOfLastWeek; d.setDate(d.getDate() + 1)) {
+        let performanceData = "";
+        const twoWeeksAgo = new Date();
+        twoWeeksAgo.setDate(currentDate.getDate() - 14);
+
+        for (let d = new Date(twoWeeksAgo); d <= currentDate; d.setDate(d.getDate() + 1)) {
             const dateKey = getFormattedDate(d);
             if (allData[dateKey]) {
-                weeklyDataString += `\nDía (${dateKey}):\n`;
-                if (allData[dateKey].note) {
-                    weeklyDataString += `- Notas: "${allData[dateKey].note}"\n`;
-                }
+                performanceData += `\nDía (${dateKey}):\n`;
                 for (const ex in allData[dateKey]) {
-                    if (ex !== 'note') {
+                    if (ex !== 'note' && ex !== 'newPRs') {
                         const sets = allData[dateKey][ex].map(s => `${s.weight || 0}kg x ${s.reps || 0} reps`).join(', ');
-                        weeklyDataString += `- ${ex}: ${sets}\n`;
+                        performanceData += `- ${ex}: ${sets}\n`;
                     }
                 }
             }
         }
-        
-        // 2. Crear el prompt
+
         const prompt = `
-            Eres un entrenador personal experto en fitness y análisis de datos. Analiza los siguientes datos de entrenamiento de la última semana de un usuario y proporciona un análisis conciso y útil en español.
+            Eres un entrenador personal motivador. Analiza el rendimiento de las últimas 2 semanas de un usuario y genera un desafío específico, medible y motivador para la próxima semana. El objetivo es atacar un punto débil o potenciar una fortaleza.
 
-            **Contexto del Usuario:**
-            - Objetivo Principal: Hipertrofia
-            - Nivel: Intermedio
+            **Datos de Rendimiento:**
+            ${performanceData || "El usuario no tiene muchos datos registrados."}
 
-            **Datos de la Semana (del ${startDateOfLastWeek.toLocaleDateString('es-ES')} al ${endDateOfLastWeek.toLocaleDateString('es-ES')}):**
-            ${weeklyDataString || "No se registraron entrenamientos esta semana."}
+            **Instrucciones:**
+            - Identifica un área de mejora (ej. un ejercicio estancado, un grupo muscular con menos volumen).
+            - Crea un desafío de una sola frase que sea claro y directo.
+            - El tono debe ser inspirador y positivo.
 
-            **Análisis Requerido (responde en formato markdown):**
-            1.  **Resumen General:** Proporciona un breve resumen del rendimiento y la consistencia de la semana.
-            2.  **Puntos Clave:** Identifica los mayores logros (ej. levantamientos pesados) y los puntos débiles o estancamientos.
-            3.  **Conexión entre Notas y Rendimiento:** Analiza si las notas del usuario (como mal sueño, estrés, molestias) se correlacionan con un bajo rendimiento en algún día específico.
-            4.  **Sugerencias Accionables:** Ofrece 2-3 sugerencias específicas para la próxima semana.
+            **Ejemplos de Desafíos:**
+            - "Esta semana, tu desafío es añadir una serie adicional a todos los ejercicios de hombro para romper esa meseta."
+            - "He notado que tu fuerza en sentadilla hack está subiendo. Tu desafío es intentar aumentar 2.5kg en tu serie más pesada."
+            - "Para mejorar la conexión mente-músculo, tu desafío es realizar la fase excéntrica (bajada) de cada repetición de espalda en 3 segundos."
         `;
         
-        // 3. Llamar a la función serverless (proxy)
         try {
-            // La URL ahora apunta a nuestra propia función serverless, no a Google directamente.
-            const apiUrl = "/api/analizar";
-            
-            const response = await fetch(apiUrl, {
+            const response = await fetch("/api/analizar", {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: prompt }) // Enviamos el prompt en el cuerpo
+                body: JSON.stringify({ prompt })
             });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || `Error del servidor: ${response.statusText}`);
-            }
-
+            if (!response.ok) throw new Error('La respuesta de la IA no fue exitosa.');
+            
             const result = await response.json();
-            const analysis = result.candidates[0].content.parts[0].text;
-            reportContent.textContent = analysis;
+            const challengeText = result.candidates[0].content.parts[0].text.replace(/\"/g, ''); // Limpiar comillas
+
+            const weekNumber = `W${currentDate.getFullYear()}-${getWeekOfYear(currentDate)}`;
+            const data = getStoredData();
+            data.challenge = { week: weekNumber, text: challengeText };
+            setStoredData(data);
+
+            challengeContentEl.innerHTML = `<p>${challengeText}</p>`;
 
         } catch (error) {
-            reportContent.textContent = `Error al generar el análisis: ${error.message}\n\nAsegúrate de que la aplicación está desplegada en un servicio como Vercel y que la clave API está configurada correctamente en las variables de entorno.`;
-        } finally {
-            reportLoader.classList.remove('visible');
+            challengeContentEl.innerHTML = `<p>Error al generar el desafío. Inténtalo de nuevo.</p><button id="generate-challenge-btn" class="primary-btn">Generar mi desafío con IA</button>`;
+            console.error("Error generating challenge:", error);
         }
     }
 
+    function checkForNewPR(date, exercise, currentSets) {
+        const allData = getStoredData();
+        const sevenDaysAgo = new Date(date);
+        sevenDaysAgo.setDate(date.getDate() - 7);
+
+        let bestPrevSet = { weight: 0, reps: 0 };
+        // Buscar el mejor set en el historial (más allá de 7 días)
+        for (const dateKey in allData) {
+            if (new Date(dateKey) < sevenDaysAgo && allData[dateKey][exercise]) {
+                allData[dateKey][exercise].forEach(set => {
+                    if (set.weight > bestPrevSet.weight) {
+                        bestPrevSet = set;
+                    } else if (set.weight === bestPrevSet.weight && set.reps > bestPrevSet.reps) {
+                        bestPrevSet = set;
+                    }
+                });
+            }
+        }
+        
+        let bestCurrentSet = { weight: 0, reps: 0 };
+        currentSets.forEach(set => {
+            if (set.weight > bestCurrentSet.weight) {
+                bestCurrentSet = set;
+            } else if (set.weight === bestCurrentSet.weight && set.reps > bestCurrentSet.reps) {
+                bestCurrentSet = set;
+            }
+        });
+
+        if (bestCurrentSet.weight > bestPrevSet.weight || (bestCurrentSet.weight === bestPrevSet.weight && bestCurrentSet.reps > bestPrevSet.reps)) {
+            const dateKey = getFormattedDate(date);
+            if (!allData[dateKey].newPRs) allData[dateKey].newPRs = [];
+            if (!allData[dateKey].newPRs.includes(exercise)) {
+                allData[dateKey].newPRs.push(exercise);
+            }
+            setStoredData(allData);
+        }
+    }
 
     // --- LÓGICA DE EVENTOS ---
     function setupViewListeners() {
@@ -349,6 +457,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.rest-timer-btn').forEach(el => el.addEventListener('click', startRestTimer));
         document.querySelectorAll('.sets-grid input').forEach(el => el.addEventListener('change', handleInputChange));
         document.getElementById('daily-notes')?.addEventListener('input', (e) => saveNote(date, e.target.value));
+        document.getElementById('generate-challenge-btn')?.addEventListener('click', generateWeeklyChallenge);
     }
 
     function handleInputChange(e) {
@@ -410,7 +519,7 @@ document.addEventListener('DOMContentLoaded', () => {
         clearInterval(timerInterval);
         timerModal.style.display = 'block';
         const timerDisplay = document.getElementById('timer-display');
-        timerDisplay.textContent = `01:30`; // Reset display
+        timerDisplay.textContent = `01:30`;
         
         timerInterval = setInterval(() => {
             remaining--;
@@ -423,6 +532,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }, 1000);
     }
+    
+    // --- UTILIDADES ---
+    function getWeekOfYear(date) {
+        const start = new Date(date.getFullYear(), 0, 1);
+        const diff = (date - start) + ((start.getTimezoneOffset() - date.getTimezoneOffset()) * 60 * 1000);
+        const oneDay = 1000 * 60 * 60 * 24;
+        return Math.floor(diff / oneDay / 7) + 1;
+    }
+
 
     // --- CERRAR MODALES Y COPIAR REPORTE ---
     document.querySelector('#exercise-modal .close-btn').addEventListener('click', () => exerciseModal.style.display = 'none');
