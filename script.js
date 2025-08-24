@@ -1,8 +1,19 @@
 document.addEventListener('DOMContentLoaded', () => {
 
     // --- BASE DE DATOS Y CONFIGURACIÓN ---
-    const trainingData = {
-        // ... (resto de la estructura de datos)
+    const trainingData = {};
+    const muscleGroupMapping = {
+        "Pectoral": ["Press de Banca en Máquina", "Press Inclinado en Máquina", "Fondos en Paralelas"],
+        "Hombros": ["Press de Hombro en Máquina", "Elevaciones Laterales con Mancuernas", "Vuelos Posteriores en Máquina"],
+        "Tríceps": ["Máquina de Press de Tríceps Sentado", "Extensiones de Tríceps en Polea con Cuerda", "Fondos en Paralelas"],
+        "Dorsal": ["Dominadas (o Jalón al Pecho)", "Remo en Máquina Horizontal Divergente", "Remo Sentado en Banco con Polea Baja"],
+        "Bíceps": ["Curl de Bíceps en Máquina", "Curl Martillo con Mancuernas"],
+        "Trapecio": ["Encogimientos con Mancuernas"],
+        "Cuádriceps": ["Sentadilla Hack en Máquina", "Prensa de Piernas", "Extensiones de Cuádriceps", "Sentadilla Goblet con Mancuerna"],
+        "Isquios": ["Curl Femoral"],
+        "Glúteos": ["Hip Thrust en Máquina", "Sentadilla Hack en Máquina", "Prensa de Piernas"],
+        "Gemelos": ["Elevación de Talones"],
+        "Abdominales": ["Abdominales (Crunch en Máquina)"]
     };
 
     // --- INICIO DE LA BASE DE DATOS COMPLETA ---
@@ -50,6 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const appContainer = document.getElementById('app');
     const exerciseModal = document.getElementById('exercise-modal');
     const timerModal = document.getElementById('timer-modal');
+    const reportModal = document.getElementById('report-modal');
 
     const storageKey = 'gymProgressData';
     const getStoredData = () => JSON.parse(localStorage.getItem(storageKey)) || {};
@@ -67,31 +79,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const getFormattedDate = (date) => date.toISOString().split('T')[0];
     
-    /**
-     * Calcula la semana actual del plan de entrenamiento.
-     * **MODIFICADO:** La duración total del plan ahora es de 9 semanas.
-     * @param {Date} date - La fecha actual.
-     * @returns {number} El número de la semana actual (1-9).
-     */
     function getCurrentWeek(date) {
         const diffTime = Math.max(0, date - startDate);
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-        return Math.min(9, Math.max(1, Math.ceil(diffDays / 7))); // Cambiado 13 a 9
+        return Math.min(9, Math.max(1, Math.ceil(diffDays / 7)));
     }
 
-    /**
-     * Determina el mesociclo actual basado en la semana.
-     * **MODIFICADO:** Ahora sigue la secuencia Meso2 -> Descarga -> Meso3.
-     * @param {number} week - La semana actual del plan.
-     * @returns {{key: string, name: string}} El objeto con la clave y nombre del mesociclo.
-     */
     function getMesocycle(week) {
-        if (week <= 4) return { key: 'meso2', name: 'Mesociclo 2: Intensificación' }; // Semanas 1-4
-        if (week === 5) return { key: 'descarga', name: 'Semana de Descarga' };      // Semana 5
-        if (week <= 9) return { key: 'meso3', name: 'Mesociclo 3: Realización' };     // Semanas 6-9
+        if (week <= 4) return { key: 'meso2', name: 'Mesociclo 2: Intensificación' };
+        if (week === 5) return { key: 'descarga', name: 'Semana de Descarga' };
+        if (week <= 9) return { key: 'meso3', name: 'Mesociclo 3: Realización' };
         return { key: 'none', name: 'Fuera del plan' };
     }
 
+    // --- LÓGICA DE RENDERIZADO ---
     function renderApp() {
         appContainer.innerHTML = `
             <div id="workout-view" class="view active"></div>
@@ -125,7 +126,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let exercisesHTML = Object.entries(workout.exercises).map(([name, details]) => {
                 const mesoDetails = details[meso.key];
-                // Si por alguna razón un ejercicio no está definido para el meso actual, no lo mostramos
                 if (!mesoDetails) return ''; 
                 
                 const numSets = parseInt(mesoDetails.series.split('-').pop());
@@ -188,7 +188,13 @@ document.addEventListener('DOMContentLoaded', () => {
             chartsHTML += `<div class="chart-container"><canvas id="${canvasId}"></canvas></div>`;
         });
         
-        progressView.innerHTML = `<h1>Progreso y Volumen</h1>` + (chartsHTML || `<p class="no-progress">Aún no hay datos de progreso. ¡Completa un entrenamiento para empezar!</p>`);
+        progressView.innerHTML = `
+            <div class="progress-header">
+                <h1>Progreso y Volumen</h1>
+                <button id="generate-report-btn" class="primary-btn">Generar Reporte Semanal</button>
+            </div>
+            <div id="charts-wrapper">${chartsHTML}</div>
+        `;
         
         const allData = getStoredData();
         let chartsCreated = 0;
@@ -200,8 +206,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (chartsCreated === 0) {
-            progressView.innerHTML = `<h1>Progreso y Volumen</h1><p class="no-progress">Aún no hay datos de progreso. ¡Completa un entrenamiento para empezar!</p>`;
+            document.getElementById('charts-wrapper').innerHTML = `<p class="no-progress">Aún no hay datos de progreso. ¡Completa un entrenamiento para empezar!</p>`;
         }
+        
+        document.getElementById('generate-report-btn').addEventListener('click', generateWeeklyReport);
     }
 
     function createChart(data, exerciseName, canvasId, chartLabel) {
@@ -231,11 +239,111 @@ document.addEventListener('DOMContentLoaded', () => {
         return true;
     }
 
+    // --- LÓGICA DE REPORTE SEMANAL ---
+    function generateWeeklyReport() {
+        const today = new Date();
+        const dayOfWeek = today.getDay(); // 0=Domingo, 1=Lunes, ...
+        
+        // Calcular inicio y fin de la última semana completa (Lunes a Domingo)
+        const endDateOfLastWeek = new Date(today);
+        endDateOfLastWeek.setDate(today.getDate() - (dayOfWeek === 0 ? 7 : dayOfWeek));
+        const startDateOfLastWeek = new Date(endDateOfLastWeek);
+        startDateOfLastWeek.setDate(endDateOfLastWeek.getDate() - 6);
+
+        const startDateOfTwoWeeksAgo = new Date(startDateOfLastWeek);
+        startDateOfTwoWeeksAgo.setDate(startDateOfLastWeek.getDate() - 7);
+
+        const allData = getStoredData();
+        let report = "";
+
+        // 1. Fase Específica del Plan
+        const week = getCurrentWeek(endDateOfLastWeek);
+        const meso = getMesocycle(week);
+        report += `REPORTE SEMANAL (Semana del ${startDateOfLastWeek.toLocaleDateString('es-ES')} al ${endDateOfLastWeek.toLocaleDateString('es-ES')})\n`;
+        report += `===========================================================\n`;
+        report += `Fase del Plan: ${meso.name}, Semana ${week} de 9\n\n`;
+
+        // 2. Progresión de Cargas/Repeticiones
+        report += `PROGRESIÓN DE CARGAS (Mejor serie vs. semana anterior):\n`;
+        const mainExercises = ["Press de Banca en Máquina", "Sentadilla Hack en Máquina", "Dominadas (o Jalón al Pecho)", "Press de Hombro en Máquina"];
+        
+        function findBestSet(startDate, endDate, exercise) {
+            let bestSet = { weight: 0, reps: 0 };
+            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                const dateKey = getFormattedDate(d);
+                if (allData[dateKey] && allData[dateKey][exercise]) {
+                    allData[dateKey][exercise].forEach(set => {
+                        if (set.weight > bestSet.weight) {
+                            bestSet = set;
+                        }
+                    });
+                }
+            }
+            return bestSet.weight > 0 ? bestSet : null;
+        }
+
+        mainExercises.forEach(ex => {
+            const lastWeekSet = findBestSet(startDateOfLastWeek, endDateOfLastWeek, ex);
+            const prevWeekSet = findBestSet(startDateOfTwoWeeksAgo, new Date(startDateOfLastWeek - 1), ex);
+            
+            if (lastWeekSet) {
+                let comparison = "(sin datos de la semana anterior)";
+                if (prevWeekSet) {
+                    const weightDiff = lastWeekSet.weight - prevWeekSet.weight;
+                    comparison = `(${weightDiff >= 0 ? '+' : ''}${weightDiff.toFixed(1)} kg vs. semana pasada)`;
+                }
+                report += `- ${ex}: ${lastWeekSet.weight} kg x ${lastWeekSet.reps} reps ${comparison}\n`;
+            } else {
+                report += `- ${ex}: No se registraron datos esta semana.\n`;
+            }
+        });
+        report += `\n`;
+
+        // 3. RIR Promedio y Volumen
+        const weeklyRIRs = new Set();
+        const volumeByMuscle = {};
+        Object.keys(muscleGroupMapping).forEach(group => volumeByMuscle[group] = 0);
+
+        for (let d = new Date(startDateOfLastWeek); d <= endDateOfLastWeek; d.setDate(d.getDate() + 1)) {
+            const dateKey = getFormattedDate(d);
+            const dayType = trainingCalendar[dateKey];
+            if (dayType && dayType !== 'descanso' && allData[dateKey]) {
+                const mesoKey = getMesocycle(getCurrentWeek(d)).key;
+                const workout = trainingData[dayType];
+                Object.keys(workout.exercises).forEach(exName => {
+                    if (allData[dateKey][exName]) {
+                        const completedSets = allData[dateKey][exName].filter(s => s.done).length;
+                        if (completedSets > 0) {
+                            weeklyRIRs.add(workout.exercises[exName][mesoKey].rir);
+                            for (const group in muscleGroupMapping) {
+                                if (muscleGroupMapping[group].includes(exName)) {
+                                    volumeByMuscle[group] += completedSets;
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        
+        report += `RIR PROMEDIO (Estimado según el plan): ${[...weeklyRIRs].join(', ') || 'N/A'}\n\n`;
+        report += `VOLUMEN DE ENTRENAMIENTO (Series efectivas completadas):\n`;
+        Object.entries(volumeByMuscle).filter(([,vol]) => vol > 0).forEach(([group, vol]) => {
+            report += `- ${group}: ${vol} series\n`;
+        });
+
+        // Mostrar el reporte
+        document.getElementById('report-content').textContent = report;
+        reportModal.style.display = 'block';
+    }
+
+
+    // --- LÓGICA DE EVENTOS ---
     function setupViewListeners() {
         document.getElementById('nav-workout').addEventListener('click', () => switchView('workout-view'));
         document.getElementById('nav-progress').addEventListener('click', () => {
             switchView('progress-view');
-            renderProgressView(); // Re-render charts every time view is switched
+            renderProgressView();
         });
     }
     
@@ -309,17 +417,28 @@ document.addEventListener('DOMContentLoaded', () => {
             timerDisplay.textContent = `${minutes}:${seconds}`;
             if (remaining <= 0) {
                 clearInterval(timerInterval);
-                // Optional: play a sound
                 timerModal.style.display = 'none';
             }
         }, 1000);
     }
 
+    // --- CERRAR MODALES Y COPIAR REPORTE ---
     document.querySelector('#exercise-modal .close-btn').addEventListener('click', () => exerciseModal.style.display = 'none');
+    document.querySelector('#report-modal .close-btn').addEventListener('click', () => reportModal.style.display = 'none');
     document.getElementById('close-timer-btn').addEventListener('click', () => { clearInterval(timerInterval); timerModal.style.display = 'none'; });
+    
+    document.getElementById('copy-report-btn').addEventListener('click', (e) => {
+        const reportText = document.getElementById('report-content').textContent;
+        navigator.clipboard.writeText(reportText).then(() => {
+            e.target.textContent = '¡Copiado!';
+            setTimeout(() => { e.target.textContent = 'Copiar Reporte'; }, 2000);
+        });
+    });
+
     window.addEventListener('click', (e) => {
         if (e.target == exerciseModal) exerciseModal.style.display = 'none';
         if (e.target == timerModal) { clearInterval(timerInterval); timerModal.style.display = 'none'; }
+        if (e.target == reportModal) reportModal.style.display = 'none';
     });
 
     renderApp();
